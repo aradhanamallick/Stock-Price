@@ -1,0 +1,85 @@
+import pandas as pd
+import numpy as np
+import ipywidgets as widgets
+from IPython.display import display
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+stock_data = pd.read_csv('stockdata2.csv')
+stock_data.drop(columns = 'Unnamed: 0',inplace = True)
+stock_data['Date'] = pd.to_datetime(stock_data['Date'])
+stock_data['Year'] = stock_data['Date'].dt.year
+stock_data['Month'] = stock_data['Date'].dt.strftime('%b')
+stock_data.head()
+
+ALL = 'ALL'
+def unique_sorted_values_plus_ALL(array):
+    unique = array.unique().tolist()
+    #unique.sort()
+    unique.insert(0, ALL)
+    return unique
+
+item_layout = widgets.Layout(margin='0 0 50px 0')
+
+output_overall = widgets.Output()
+plot_output_overall = widgets.Output()
+
+dropdown_year = widgets.Dropdown(options = unique_sorted_values_plus_ALL(stock_data.Year),description = 'Choose Year')
+dropdown_Month = widgets.Dropdown(options = unique_sorted_values_plus_ALL(stock_data.Month), description = 'Month')
+dropdown_Stocks = widgets.Dropdown(options = unique_sorted_values_plus_ALL(stock_data.stock),  description = 'Stock')
+
+input_widgets = widgets.HBox([dropdown_year,dropdown_Month,dropdown_Stocks],layout = item_layout)
+
+tab = widgets.Tab([output_overall, plot_output_overall],layout = item_layout)
+tab.set_title(0, 'Data')
+tab.set_title(1, 'Plot')
+
+def common_filtering(year,month,stock):
+    output_overall.clear_output()
+    plot_output_overall.clear_output()
+    
+    if (year == ALL) & (month == ALL) & (stock == ALL):
+        common_filter = stock_data
+    elif (year == ALL) & (month == ALL):
+        common_filter = stock_data[stock_data.stock == stock]
+    elif (year == ALL) & (stock == ALL):
+        common_filter = stock_data[stock_data.Month == month]
+    elif (month == ALL) & (stock == ALL):
+        common_filter = stock_data[stock_data.Year == year]
+    elif (year == ALL):
+        common_filter = stock_data[(stock_data.Month == month) & (stock_data.stock == stock)]
+    elif (month == ALL):
+        common_filter = stock_data[(stock_data.Year == year) & (stock_data.stock == stock)]
+    elif (stock == ALL):
+        common_filter = stock_data[(stock_data.Year == year) & (stock_data.Month == month)]
+    else:
+        common_filter = stock_data[(stock_data.Year == year) & 
+                                  (stock_data.Month == month) & (stock_data.stock == stock)]
+    with output_overall:
+        display(common_filter)
+    with plot_output_overall:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(common_filter['Date'],common_filter['value'],'-r',label = 'Stock Value')
+        ax2 = ax.twinx()
+        ax2.plot(common_filter['Date'],common_filter['change'],'--b',label = 'Stock Value Change')
+        ax.legend(loc = 0)
+        ax2.legend(loc = 3)
+        ax2.set_ylabel('Stock Price Changes')
+        ax.set_ylabel('Stock Price')
+        plt.setp(ax.xaxis.get_majorticklabels(),rotation=90,horizontalalignment='right')
+        plt.show()
+        
+def dropdown_year_eventhandler(change):
+    common_filtering(change.new, dropdown_Month.value,dropdown_Stocks.value)
+def dropdown_month_eventhandler(change):
+    common_filtering( dropdown_year.value,change.new,dropdown_Stocks.value)
+def dropdown_stock_eventhandler(change):
+    common_filtering( dropdown_year.value,dropdown_Month.value,change.new)
+
+dropdown_year.observe(dropdown_year_eventhandler, names='value')
+dropdown_Month.observe(dropdown_month_eventhandler, names='value')
+dropdown_Stocks.observe(dropdown_stock_eventhandler, names='value')
+
+dashboard = widgets.VBox([input_widgets, tab])
+display(dashboard)
